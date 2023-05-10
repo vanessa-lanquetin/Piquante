@@ -5,8 +5,10 @@
 /out-tsc
 /bazel-out
 
+
 # Node
 /node_modules
+/images
 npm-debug.log
 yarn-error.log
 
