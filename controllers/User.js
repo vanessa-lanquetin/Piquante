@@ -1,22 +1,32 @@
-const bcrypt = require("bcrypt"); // Importation du module bcrypt pour le chiffrement des mots de passe
-const User = require("../models/user"); // Importation du modèle User
-const jwt = require("jsonwebtoken"); // Importation du module jsonwebtoken pour la gestion des tokens JWT
-const { set } = require("mongoose"); // Importation de la fonction 'set' de Mongoose pour la gestion des paramètres
-require("dotenv").config(); // Chargement des variables d'environnement depuis le fichier .env
+const bcrypt = require("bcrypt");
+const User = require("../models/user");
+const jwt = require("jsonwebtoken");
+const { set } = require("mongoose");
+require("dotenv").config();
+const passwordValidator = require("password-validator");
 
-const passwordRegex = /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9]).{6,}$/; // Expression régulière pour valider le mot de passe
-const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/; // Expression régulière pour valider l'adresse email
+const emailRegex = /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/;
+
+const passwordSchema = new passwordValidator();
+
+passwordSchema
+  .is()
+  .min(6) // Longueur minimale de 6 caractères
+  .has()
+  .uppercase() // Doit contenir au moins une lettre majuscule
+  .has()
+  .lowercase() // Doit contenir au moins une lettre minuscule
+  .has()
+  .digits(); // Doit contenir au moins un chiffre
 
 exports.signup = (req, res, next) => {
-  const { email, password } = req.body; // Récupération de l'email et du mot de passe depuis le corps de la requête
+  const { email, password } = req.body;
 
-  // Valider l'adresse email
   if (!emailRegex.test(email)) {
     return res.status(400).json({ message: "Adresse email invalide" });
   }
 
-  // Valider le mot de passe
-  if (!passwordRegex.test(password)) {
+  if (!passwordSchema.validate(password)) {
     return res.status(400).json({
       message:
         "Le mot de passe doit contenir au moins 1 lettre majuscule, 1 lettre minuscule, 1 chiffre et avoir une longueur minimale de 6 caractères",
@@ -24,43 +34,43 @@ exports.signup = (req, res, next) => {
   }
 
   bcrypt
-    .hash(password, 10) // Chiffrer le mot de passe avec un coût de hachage de 10
+    .hash(password, 10)
     .then((hash) => {
       const user = new User({
         email: email,
-        password: hash, // Utiliser le mot de passe chiffré pour créer un nouvel utilisateur
+        password: hash,
       });
       user
-        .save() // Sauvegarder l'utilisateur dans la base de données
+        .save()
         .then(() => res.status(201).json({ message: "Utilisateur créé !" }))
         .catch((error) => res.status(400).json({ error }));
     })
     .catch((error) => res.status(500).json({ error }));
 };
 
-const jwtSecret = process.env.JWT_SECRET || "defaultsecret"; // Clé secrète pour la génération des tokens JWT
+const jwtSecret = process.env.JWT_SECRET || "defaultsecret";
+
 exports.login = async (req, res, next) => {
-  const { email, password } = req.body; // Récupération de l'email et du mot de passe depuis le corps de la requête
+  const { email, password } = req.body;
 
-  const foundUser = await User.findOne({ email }); // Recherche de l'utilisateur dans la base de données par son email
+  const foundUser = await User.findOne({ email });
 
-  // Valider l'adresse email
   if (!foundUser) {
     res.status(401).json({ msg: "identifiant/mot de passe incorrecte" });
   } else {
-    // Valider le mot de passe
-    const valid = await bcrypt.compare(password, foundUser.password); // Comparer le mot de passe fourni avec celui stocké dans la base de données
+    const valid = await bcrypt.compare(password, foundUser.password);
+
     if (!valid) {
       res.status(401).json({ msg: "identifiant/mot de passe incorrecte" });
     } else {
       const token = jwt.sign(
         {
-          userId: foundUser._id, // Création du token JWT avec l'ID de l'utilisateur comme payload
+          userId: foundUser._id,
         },
-        jwtSecret, // Utilisation de la clé secrète pour la génération du token JWT
-        { expiresIn: "24h" } // Durée de validité du token (24 heures)
+        jwtSecret,
+        { expiresIn: "24h" }
       );
-      res.status(200).json({ userId: foundUser._id, token }); // Envoi de l'ID de l'utilisateur et du token JWT dans la réponse
+      res.status(200).json({ userId: foundUser._id, token });
     }
   }
 };

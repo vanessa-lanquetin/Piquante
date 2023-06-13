@@ -4,7 +4,7 @@ const router = express.Router();
 // controller de user
 const userController = require("../controllers/user.js");
 
-// routes pour le functions
+// routes pour inscription et connexion
 router.post("/auth/signup", userController.signup);
 router.post("/auth/login", userController.login);
 
